@@ -37,6 +37,11 @@ class ApplicationStub extends Container implements Application
         //
     }
 
+    public function runningUnitTests()
+    {
+        // TODO: Implement runningUnitTests() method.
+    }
+
     public function registerDeferredProvider($provider, $service = null)
     {
         //
@@ -63,6 +68,16 @@ class ApplicationStub extends Container implements Application
     }
 
     public function booted($callback)
+    {
+        //
+    }
+
+    public function getCachedPackagesPath()
+    {
+        //
+    }
+
+    public function runningInConsole()
     {
         //
     }

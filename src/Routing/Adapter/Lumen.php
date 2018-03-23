@@ -7,8 +7,8 @@ use ReflectionClass;
 use FastRoute\Dispatcher;
 use FastRoute\RouteParser;
 use Illuminate\Support\Str;
-use Illuminate\Http\Request;
 use FastRoute\DataGenerator;
+use Illuminate\Http\Request;
 use FastRoute\RouteCollector;
 use Laravel\Lumen\Application;
 use Dingo\Api\Contract\Routing\Adapter;
@@ -38,11 +38,11 @@ class Lumen implements Adapter
     protected $generator;
 
     /**
-     * FastRoute dispatcher class name.
+     * FastRoute dispatcher resolver callback.
      *
-     * @var string
+     * @var callable
      */
-    protected $dispatcher;
+    protected $dispatcherResolver;
 
     /**
      * Array of registered routes.
@@ -50,6 +50,20 @@ class Lumen implements Adapter
      * @var array
      */
     protected $routes = [];
+
+    /**
+     * Array of merged old routes and API routes.
+     *
+     * @var array
+     */
+    protected $mergedRoutes = [];
+
+    /**
+     * Routes already defined on the router.
+     *
+     * @var \Illuminate\Routing\RouteCollection
+     */
+    protected $oldRoutes;
 
     /**
      * Indicates if the middleware has been removed from the application instance.
@@ -64,16 +78,16 @@ class Lumen implements Adapter
      * @param \Laravel\Lumen\Application $app
      * @param \FastRoute\RouteParser     $parser
      * @param \FastRoute\DataGenerator   $generator
-     * @param string                     $dispatcher
+     * @param callable                   $dispatcherResolver
      *
      * @return void
      */
-    public function __construct(Application $app, RouteParser $parser, DataGenerator $generator, $dispatcher)
+    public function __construct(Application $app, RouteParser $parser, DataGenerator $generator, callable $dispatcherResolver)
     {
         $this->app = $app;
         $this->parser = $parser;
         $this->generator = $generator;
-        $this->dispatcher = $dispatcher;
+        $this->dispatcherResolver = $dispatcherResolver;
     }
 
     /**
@@ -92,15 +106,36 @@ class Lumen implements Adapter
 
         $this->removeMiddlewareFromApp();
 
-        $routes = $this->routes[$version];
+        $routeCollector = $this->mergeOldRoutes($version);
+        $dispatcher = call_user_func($this->dispatcherResolver, $routeCollector);
 
-        $this->app->setDispatcher(
-            new $this->dispatcher($routes->getData())
-        );
+        $this->app->setDispatcher($dispatcher);
 
         $this->normalizeRequestUri($request);
 
         return $this->app->dispatch($request);
+    }
+
+    /**
+     * Merge the old application routes with the API routes.
+     *
+     * @param string $version
+     *
+     * @return array
+     */
+    protected function mergeOldRoutes($version)
+    {
+        if (! isset($this->oldRoutes)) {
+            $this->oldRoutes = $this->app->router->getRoutes();
+        }
+        if (! isset($this->mergedRoutes[$version])) {
+            $this->mergedRoutes[$version] = $this->routes[$version];
+            foreach ($this->oldRoutes as $route) {
+                $this->mergedRoutes[$version]->addRoute($route['method'], $route['uri'], $route['action']);
+            }
+        }
+
+        return $this->mergedRoutes[$version];
     }
 
     /**
@@ -226,9 +261,14 @@ class Lumen implements Adapter
         $reflection = new ReflectionClass($this->app);
         $property = $reflection->getProperty('middleware');
         $property->setAccessible(true);
-
-        $property->setValue($this->app, []);
-
+        $oldMiddlewares = $property->getValue($this->app);
+        $newMiddlewares = [];
+        foreach ($oldMiddlewares as $middle) {
+            if ((new ReflectionClass($middle))->hasMethod('terminate') && $middle != 'Dingo\Api\Http\Middleware\Request') {
+                $newMiddlewares = array_merge($newMiddlewares, [$middle]);
+            }
+        }
+        $property->setValue($this->app, $newMiddlewares);
         $property->setAccessible(false);
     }
 

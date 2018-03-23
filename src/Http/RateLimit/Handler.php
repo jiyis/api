@@ -93,16 +93,12 @@ class Handler
         // If the throttle instance is already set then we'll just carry on as
         // per usual.
         if ($this->throttle instanceof Throttle) {
-            if ($this->throttle instanceof HasRateLimiter) {
-                $this->setRateLimiter([$this->throttle, 'getRateLimiter']);
-            }
 
-        // If the developer specified a certain amount of requests or expiration
+            // If the developer specified a certain amount of requests or expiration
         // time on a specific route then we'll always use the route specific
         // throttle with the given values.
         } elseif ($limit > 0 || $expires > 0) {
             $this->throttle = new Route(['limit' => $limit, 'expires' => $expires]);
-
             $this->keyPrefix = sha1($request->path());
 
         // Otherwise we'll use the throttle that gives the consumer the largest
@@ -116,6 +112,10 @@ class Handler
 
         if (is_null($this->throttle)) {
             return;
+        }
+
+        if ($this->throttle instanceof HasRateLimiter) {
+            $this->setRateLimiter([$this->throttle, 'getRateLimiter']);
         }
 
         $this->prepareCacheStore();
@@ -171,7 +171,7 @@ class Handler
      */
     protected function key($key)
     {
-        return sprintf('dingo.api.%s.%s.%s', $this->keyPrefix, $key, $this->getRateLimiter());
+        return sprintf('dingo.api.%s.%s', $key, $this->getRateLimiter());
     }
 
     /**

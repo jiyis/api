@@ -3,10 +3,10 @@
 namespace Dingo\Api\Tests\Http\Parser;
 
 use Dingo\Api\Http\Request;
-use PHPUnit_Framework_TestCase;
+use PHPUnit\Framework\TestCase;
 use Dingo\Api\Http\Parser\Accept;
 
-class AcceptTest extends PHPUnit_Framework_TestCase
+class AcceptTest extends TestCase
 {
     public function testParsingInvalidAcceptReturnsDefaults()
     {
@@ -27,7 +27,7 @@ class AcceptTest extends PHPUnit_Framework_TestCase
     {
         $parser = new Accept('vnd', 'api', 'v1', 'json');
 
-        $accept = $parser->parse($this->createRequest('foo', 'GET', ['accept' => 'application/vnd.foo.v2+xml']), true);
+        $parser->parse($this->createRequest('foo', 'GET', ['accept' => 'application/vnd.foo.v2+xml']), true);
     }
 
     public function testParsingValidAcceptReturnsHeaderValues()
